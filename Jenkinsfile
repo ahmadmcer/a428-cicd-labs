@@ -1,27 +1,39 @@
-pipeline {
-    agent {
-        docker {
-            image 'node:16-buster-slim'
-            args '-p 3000:3000'
+node {
+    try {
+        stage('Checkout') {
+            checkout scm
         }
-    }
-    stages {
-        stage('Build') {
-            steps {
+
+        docker.image('node:16-buster-slim').inside('-p 3000:3000') {
+            
+            stage('Build') {
                 sh 'npm install'
             }
-        }
-        stage('Test') {
-            steps {
+
+            stage('Test') {
+                sh 'chmod +x ./jenkins/scripts/test.sh' 
                 sh './jenkins/scripts/test.sh'
             }
-        }
-        stage('Deploy') { 
-            steps {
-                sh './jenkins/scripts/deliver.sh' 
-                input message: 'Sudah selesai menggunakan React App? (Klik "Proceed" untuk mengakhiri)' 
-                sh './jenkins/scripts/kill.sh' 
+            
+            stage('Manual Approval') {
+                input message: 'Lanjutkan ke tahap Deploy?', ok: 'Proceed'
+            }
+
+            stage('Deploy') {
+                echo "Deploying application..."
+                             
+                sh '''
+                    npm start &
+                    PID=$!
+                    echo "Aplikasi berjalan dengan PID: $PID. Menunggu 1 menit..."
+                    sleep 60
+                    echo "Waktu habis. Mematikan aplikasi..."
+                    kill $PID || true
+                '''
             }
         }
+    } catch (e) {
+        currentBuild.result = 'FAILURE'
+        throw e
     }
 }

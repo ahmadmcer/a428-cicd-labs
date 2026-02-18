@@ -1,29 +1,27 @@
-node {
-    try {
-        stage('Checkout') {
-            // Mengambil code dari repository
-            checkout scm
+pipeline {
+    agent {
+        docker {
+            image 'node:16-buster-slim'
+            args '-p 3000:3000'
         }
-
-        // Mendefinisikan image docker
-        docker.image('node:16-buster-slim').inside('-p 3000:3000') {
-            
-            stage('Build') {
-                // Instalasi dependencies
+    }
+    stages {
+        stage('Build') {
+            steps {
                 sh 'npm install'
             }
-
-            stage('Test') {
-                // Memberikan izin eksekusi agar tidak error "Permission denied"
-                sh 'chmod +x ./jenkins/scripts/test.sh'
-                
-                // Menjalankan script test bawaan repository
+        }
+        stage('Test') {
+            steps {
                 sh './jenkins/scripts/test.sh'
             }
         }
-    } catch (e) {
-        // Menangkap error jika pipeline gagal
-        currentBuild.result = 'FAILURE'
-        throw e
+        stage('Deploy') { 
+            steps {
+                sh './jenkins/scripts/deliver.sh' 
+                input message: 'Sudah selesai menggunakan React App? (Klik "Proceed" untuk mengakhiri)' 
+                sh './jenkins/scripts/kill.sh' 
+            }
+        }
     }
 }
